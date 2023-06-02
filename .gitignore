@@ -1,3 +1,7 @@
+.DS_Store
+build
+
+
 # Prerequisites
 *.d
 
@@ -13,7 +17,7 @@
 
 # Compiled Dynamic libraries
 *.so
-*.dylib
+# *.dylib
 *.dll
 
 # Fortran module files
