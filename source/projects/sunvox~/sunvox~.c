@@ -25,6 +25,8 @@ void *sv_new(t_symbol *s, long argc, t_atom *argv);
 void sv_free(t_sv *x);
 void sv_assist(t_sv *x, void *b, long m, long a, char *s);
 void sv_float(t_sv *x, double f);
+t_max_err sv_test(t_sv *x);
+// void sv_cleanup(t_sv *x);
 void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags);
 void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags, void *userparam);
 
@@ -44,8 +46,10 @@ void ext_main(void *r)
 	t_class *c = class_new("sunvox~", (method)sv_new, (method)dsp_free, (long)sizeof(t_sv), 0L, A_GIMME, 0);
 
 	class_addmethod(c, (method)sv_float,	"float",	A_FLOAT, 0);
-	class_addmethod(c, (method)sv_dsp64,	"dsp64",	A_CANT, 0);
-	class_addmethod(c, (method)sv_assist,	"assist",	A_CANT, 0);
+	class_addmethod(c, (method)sv_test,		"test",				 0);
+	// class_addmethod(c, (method)sv_cleanup,	"cleanup",			 0);
+	class_addmethod(c, (method)sv_dsp64,	"dsp64",	A_CANT,  0);
+	class_addmethod(c, (method)sv_assist,	"assist",	A_CANT,  0);
 
 	class_dspinit(c);
 	class_register(CLASS_BOX, c);
@@ -74,6 +78,9 @@ void sv_free(t_sv *x)
 }
 
 
+
+
+
 void sv_assist(t_sv *x, void *b, long m, long a, char *s)
 {
 	if (m == ASSIST_INLET) { //inlet
@@ -91,41 +98,13 @@ void sv_float(t_sv *x, double f)
 }
 
 
-// registers a function for the signal chain in Max
-void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags)
+t_max_err sv_test(t_sv *x)
 {
-	post("my sample rate is: %f", samplerate);
+	// sys_getdspobjdspstate();
+	//  void *dsp_setpostprocess(method pm);
 
-	// instead of calling dsp_add(), we send the "dsp_add64" message to the object representing the dsp chain
-	// the arguments passed are:
-	// 1: the dsp64 object passed-in by the calling function
-	// 2: the symbol of the "dsp_add64" message we are sending
-	// 3: a pointer to your object
-	// 4: a pointer to your 64-bit perform method
-	// 5: flags to alter how the signal chain handles your object -- just pass 0
-	// 6: a generic pointer that you can use to pass any additional data to your perform method
-
-	object_method(dsp64, gensym("dsp_add64"), x, sv_perform64, 0, NULL);
-}
-
-
-// this is the 64-bit perform method audio vectors
-void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags, void *userparam)
-{
-	t_double *inL = ins[0];		// we get audio for each inlet of the object from the **ins argument
-	t_double *outL = outs[0];	// we get audio for each outlet of the object from the **outs argument
-	int n = sampleframes;
-
-	// this perform method simply copies the input to the output, offsetting the value
-	while (n--)
-		*outL++ = *inL++ + x->offset;
-}
-
-
-
-int test(void)
-{
-    if( sv_load_dll() ) return 1;
+	post("testing: sv_load_dll");
+    if( sv_load_dll() ) return MAX_ERR_GENERIC;
     int ver = sv_init( 0, 44100, 2, 0 );
     if( ver >= 0 )
     {
@@ -139,8 +118,52 @@ int test(void)
         sv_deinit();
     }
     sv_unload_dll();
-    return 0;
+    post("testing: sv_unload_dll");
+    return MAX_ERR_NONE;
+}
+
+// void sv_cleanup(t_sv *x)
+// {
+// 	if (!sys_getdspobjdspstate(x)) {
+// 		post("DSP OFF");
+// 	}
+// }
+
+
+
+// registers a function for the signal chain in Max
+void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags)
+{
+	post("DSP ON");
+	post("my sample rate is: %f", samplerate);
+	// AHA: no need to load dll as it is being linked to
+	// if( sv_load_dll() ) {
+	// 	error("cannot load sunvox dll");
+	// 	return;
+	// }
+	post('sv_load_dll called');
+	int ver = sv_init( 0, samplerate, 2, 0 );
+	if ( ver >= 0) {
+		error("sunvox init failed!");
+	}
+	object_method(dsp64, gensym("dsp_add64"), x, sv_perform64, 0, NULL);
 }
 
 
+// this is the 64-bit perform method audio vectors
+void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags, void *userparam)
+{
+	t_double *inL = ins[0];		// we get audio for each inlet of the object from the **ins argument
+	t_double *outL = outs[0];	// we get audio for each outlet of the object from the **outs argument
+	int n = sampleframes;
+
+	// sv_open_slot(0);
+
+	// this perform method simply copies the input to the output, offsetting the value
+	while (n--)
+		*outL++ = *inL++ + x->offset;
+
+	// sv_close_slot(0);
+	sv_deinit();
+}
 
