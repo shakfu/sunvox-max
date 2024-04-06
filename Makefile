@@ -11,7 +11,7 @@ build:
 
 clean:
 	@rm -rf build
-	@rm -rf externals/*
+	@rm -rf externals
 
 
 setup:
