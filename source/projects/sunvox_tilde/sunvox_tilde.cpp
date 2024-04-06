@@ -21,17 +21,17 @@
 
 #define N_IN_CHANNELS 2
 #define N_OUT_CHANNELS 2
-#define FLOAT32_TYPE 2
+#define FLOAT32_TYPE 1
 #define LATENCY 0
 
 // struct to represent the object's state
 typedef struct _sv {
-	t_pxobject		ob;			// the object itself (t_pxobject in MSP instead of t_object)
-	int is_initialized;			// flag to indicate if sv_init has been successfully called
-    int keep_running;           // flag to indicate whether to keep running or not
-	double			offset; 	// the value of a property of our object
-	float *in_sv_buffer;     	// intermediate sunvox input buffer
-    float *out_sv_buffer;    	// intermediate sunvox output buffer
+	t_pxobject		ob;		// the object itself (t_pxobject in MSP instead of t_object)
+	int is_initialized;		// flag to indicate if sv_init has been successfully called
+    int keep_running;       // flag to indicate whether to keep running or not
+	double offset; 	        // the value of a property of our object
+	float *in_sv_buffer;    // intermediate sunvox input buffer
+    float *out_sv_buffer;   // intermediate sunvox output buffer
 } t_sv;
 
 
@@ -141,7 +141,9 @@ void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long ma
     memset(x->in_sv_buffer, 0.f, sizeof(float) * maxvectorsize * N_IN_CHANNELS);
     memset(x->out_sv_buffer, 0.f, sizeof(float) * maxvectorsize * N_OUT_CHANNELS);
 
-    int ver = sv_init( 0, 48000, 2, SV_INIT_FLAG_USER_AUDIO_CALLBACK | SV_INIT_FLAG_AUDIO_FLOAT32);
+    int ver = sv_init( 0, 48000, 2, SV_INIT_FLAG_USER_AUDIO_CALLBACK
+                                    | SV_INIT_FLAG_AUDIO_FLOAT32
+                                    | SV_INIT_FLAG_ONE_THREAD);
     if( ver >= 0 )
     {
     	x->is_initialized = 1;
@@ -174,8 +176,8 @@ void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **
         }
     }
 
-	// int sv_audio_callback2( void* buf, int frames, int latency, uint32_t out_time, int in_type, int in_channels, void* in_buf ) SUNVOX_FN_ATTR;
-	sv_audio_callback2(x->out_sv_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, n, x->in_sv_buffer );
+    // int sv_audio_callback2( void* buf, int frames, int latency, uint32_t out_time, int in_type, int in_channels, void* in_buf ) SUNVOX_FN_ATTR;
+    sv_audio_callback2(x->out_sv_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, n, x->in_sv_buffer );
 
     for (int i = 0; i < n; i++) {
         for (int chan = 0; chan < numouts; chan++) {
@@ -183,6 +185,32 @@ void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **
         }
     }
 }
+
+
+// void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, 
+//                            long sampleframes, long flags, void *userparam)
+// {
+//     float * in_ptr = x->in_sv_buffer;
+//     float * out_ptr = x->out_sv_buffer;
+//     int n = sampleframes; // n = 64
+
+//     if (ins) {
+//         for (int i = 0; i < n; i++) {
+//             for (int chan = 0; chan < numins; chan++) {
+//                 *(in_ptr++) = ins[chan][i];
+//             }
+//         }
+//     }
+
+// 	// int sv_audio_callback2( void* buf, int frames, int latency, uint32_t out_time, int in_type, int in_channels, void* in_buf ) SUNVOX_FN_ATTR;
+// 	sv_audio_callback2(x->out_sv_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, n, x->in_sv_buffer );
+
+//     for (int i = 0; i < n; i++) {
+//         for (int chan = 0; chan < numouts; chan++) {
+//             outs[chan][i] = *out_ptr++;
+//         }
+//     }
+// }
 
 void* load_file(const char* name, size_t* file_size)
 {
@@ -303,13 +331,16 @@ t_max_err sv_test(t_sv *x)
 
     sv_play_from_beginning(0);
 
-    while (x->keep_running) {
+    int counter = 0;
+
+    while (counter <= 10) {
         post("Line counter: %f Module 7 -> %s = %d\n",
                (float)sv_get_current_line2(0) / 32,
                sv_get_module_ctl_name(0, 7, 1),    // Get controller name
                sv_get_module_ctl_value(0, 7, 1, 2) // Get controller value
         );
         sleep(1);
+        counter++;
     }
 
     sv_stop(0);
