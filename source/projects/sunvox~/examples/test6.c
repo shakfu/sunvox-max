@@ -10,8 +10,8 @@
 #include <signal.h>
 #include <math.h>
 
-#define SUNVOX_MAIN /* We are using a dynamic lib. SUNVOX_MAIN adds implementation of sv_load_dll()/sv_unload_dll() */
-#include "../sunvox.h"
+#define SUNVOX_STATIC_LIB
+#include <sunvox.h>
 
 int keep_running = 1;
 void int_handler( int param ) 
@@ -23,8 +23,8 @@ int main()
 {
     signal( SIGINT, int_handler );
 
-    if( sv_load_dll() )
-	return 1;
+    // if( sv_load_dll() )
+	// return 1;
 
     int ver = sv_init( 0, 44100, 2, 0 );
     if( ver >= 0 )
@@ -86,7 +86,7 @@ int main()
 	printf( "sv_init() error %d\n", ver );
     }
 
-    sv_unload_dll();
+    // sv_unload_dll();
 
     return 0;
 }

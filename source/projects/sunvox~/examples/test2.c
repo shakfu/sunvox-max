@@ -11,8 +11,8 @@
 #include <dlfcn.h>
 #include <signal.h>
 
-#define SUNVOX_MAIN
-#include "../sunvox.h"
+#define SUNVOX_STATIC_LIB
+#include <sunvox.h>
 
 int keep_running = 1;
 void int_handler( int param ) 
@@ -48,8 +48,8 @@ int main()
 {
     signal( SIGINT, int_handler );
 
-    if( sv_load_dll() )
-	return 1;
+    // if( sv_load_dll() )
+	// return 1;
 
     int ver = sv_init( 0, 44100, 2, 0 );
     if( ver >= 0 )
@@ -145,7 +145,7 @@ int main()
 	printf( "sv_init() error %d\n", ver );
     }
 
-    sv_unload_dll();
+    // sv_unload_dll();
 
     return 0;
 }

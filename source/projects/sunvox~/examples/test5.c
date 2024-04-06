@@ -10,8 +10,8 @@
 #include <signal.h>
 #include <math.h>
 
-#define SUNVOX_MAIN
-#include "../sunvox.h"
+#define SUNVOX_STATIC_LIB
+#include <sunvox.h>
 
 int g_sv_sample_rate = 44100; //Hz
 int g_sv_channels_num = 2; //1 - mono; 2 - stereo
@@ -28,8 +28,8 @@ int main()
 {
     signal( SIGINT, int_handler );
 
-    if( sv_load_dll() )
-	return 1;
+    // if( sv_load_dll() )
+	// return 1;
 
     int flags = SV_INIT_FLAG_USER_AUDIO_CALLBACK | SV_INIT_FLAG_ONE_THREAD;
     if( g_sv_sample_type == 2 )
@@ -171,7 +171,7 @@ int main()
 	printf( "sv_init() error %d\n", ver );
     }
 
-    sv_unload_dll();
+    // sv_unload_dll();
 
     return 0;
 }

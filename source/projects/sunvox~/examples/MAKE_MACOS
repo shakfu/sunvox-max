@@ -1,2 +1,0 @@
-#cp ../libsunvox.dylib ./
-make CFLAGS="-m64" LDFLAGS="-m64" LIBS="-lstdc++"

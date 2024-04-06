@@ -14,7 +14,6 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <dlfcn.h>
 
 /*
    Constants, data types and macros
@@ -88,7 +87,7 @@ typedef struct
         #define OS_IOS
     #endif
     #define OS_APPLE
-    #define LIBNAME "sunvox.dylib"
+    #define LIBNAME "./lib/sunvox.dylib"
 #endif
 #if defined(__linux__) || defined(linux)
     #define OS_LINUX
@@ -321,7 +320,7 @@ int sv_connect_module( int slot, int source, int destination ) SUNVOX_FN_ATTR; /
 int sv_disconnect_module( int slot, int source, int destination ) SUNVOX_FN_ATTR; /* USE LOCK/UNLOCK! */
 
 /*
-   sv_load_module() - load a module or sample; supported file formats: sunsynth, xi, wav, aiff;
+   sv_load_module() - load a module or sample; supported file formats: sunsynth, xi, wav, aiff, ogg, mp3, flac;
                       return value: new module number or negative value in case of some error;
    sv_load_module_from_memory() - load a module or sample from the memory block;
 */

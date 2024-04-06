@@ -9,8 +9,8 @@
 #include "ext_obex.h"		// required for "new" style objects
 #include "z_dsp.h"			// required for MSP objects
 
-#define SUNVOX_MAIN /* We are using a dynamic lib. SUNVOX_MAIN adds implementation of sv_load_dll()/sv_unload_dll() */ 
-#include "sunvox.h"
+#define SUNVOX_STATIC_LIB
+#include <sunvox.h>
 
 
 // struct to represent the object's state
@@ -103,8 +103,6 @@ t_max_err sv_test(t_sv *x)
 	// sys_getdspobjdspstate();
 	//  void *dsp_setpostprocess(method pm);
 
-	post("testing: sv_load_dll");
-    if( sv_load_dll() ) return MAX_ERR_GENERIC;
     int ver = sv_init( 0, 44100, 2, 0 );
     if( ver >= 0 )
     {
@@ -117,8 +115,6 @@ t_max_err sv_test(t_sv *x)
         sv_close_slot( 0 );
         sv_deinit();
     }
-    sv_unload_dll();
-    post("testing: sv_unload_dll");
     return MAX_ERR_NONE;
 }
 
@@ -141,7 +137,7 @@ void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long ma
 	// 	error("cannot load sunvox dll");
 	// 	return;
 	// }
-	post('sv_load_dll called');
+	// post('sv_load_dll called');
 	int ver = sv_init( 0, samplerate, 2, 0 );
 	if ( ver >= 0) {
 		error("sunvox init failed!");
