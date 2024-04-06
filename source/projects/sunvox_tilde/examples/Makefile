@@ -1,7 +1,7 @@
 #cp ../../macos/lib_arm64/sunvox.dylib ./
 
-INCLUDES=include
-LIBDIRS=lib
+INCLUDES=../include
+LIBDIRS=../lib
 CFLAGS="-m64"
 LDFLAGS="-m64"
 LIBS=-lstdc++ -lsunvox
@@ -15,9 +15,14 @@ compile =												\
 
 TARGETS = test_static test1 test2 test3 test4 test5 test6 test7 test8
 
+
+
 all:
 	@$(foreach target,$(TARGETS),$(call compile,$(target)))
 
+
+fix:
+	@install_name_tool -id @executable_path/../lib/sunvox.dylib ../lib/sunvox.dylib
 
 clean:
 	@rm *.o

@@ -12,11 +12,18 @@
 #define SUNVOX_STATIC_LIB
 #include <sunvox.h>
 
+#define N_IN_CHANNELS 2
+#define N_OUT_CHANNELS 2
+#define FLOAT32_TYPE 2
+#define LATENCY 0
 
 // struct to represent the object's state
 typedef struct _sv {
 	t_pxobject		ob;			// the object itself (t_pxobject in MSP instead of t_object)
+	int is_initialized;			// flag to indicate if sv_init has been successfully called
 	double			offset; 	// the value of a property of our object
+	float *in_sv_buffer;     	// intermediate sunvox input buffer
+    float *out_sv_buffer;    	// intermediate sunvox output buffer
 } t_sv;
 
 
@@ -47,7 +54,6 @@ void ext_main(void *r)
 
 	class_addmethod(c, (method)sv_float,	"float",	A_FLOAT, 0);
 	class_addmethod(c, (method)sv_test,		"test",				 0);
-	// class_addmethod(c, (method)sv_cleanup,	"cleanup",			 0);
 	class_addmethod(c, (method)sv_dsp64,	"dsp64",	A_CANT,  0);
 	class_addmethod(c, (method)sv_assist,	"assist",	A_CANT,  0);
 
@@ -66,17 +72,24 @@ void *sv_new(t_symbol *s, long argc, t_atom *argv)
 		// use 0 if you don't need inlets
 		outlet_new(x, "signal"); 		// signal outlet (note "signal" rather than NULL)
 		x->offset = 0.0;
+		x->is_initialized = 0;
+        x->in_sv_buffer = NULL;
+        x->out_sv_buffer = NULL;		
 	}
 	return (x);
 }
 
 
-// NOT CALLED!, we use dsp_free for a generic free function
 void sv_free(t_sv *x)
 {
-	;
+    delete[] x->in_sv_buffer;
+    delete[] x->out_sv_buffer;
+    if (x->is_initialized) {
+        sv_close_slot(0);
+        sv_deinit();
+    }
+    dsp_free((t_pxobject *)x);
 }
-
 
 
 
@@ -103,7 +116,7 @@ t_max_err sv_test(t_sv *x)
 	// sys_getdspobjdspstate();
 	//  void *dsp_setpostprocess(method pm);
 
-    int ver = sv_init( 0, 44100, 2, 0 );
+    int ver = sv_init( 0, 48000, 2, SV_INIT_FLAG_USER_AUDIO_CALLBACK | SV_INIT_FLAG_AUDIO_FLOAT32);
     if( ver >= 0 )
     {
         sv_open_slot( 0 );
@@ -118,48 +131,68 @@ t_max_err sv_test(t_sv *x)
     return MAX_ERR_NONE;
 }
 
-// void sv_cleanup(t_sv *x)
-// {
-// 	if (!sys_getdspobjdspstate(x)) {
-// 		post("DSP OFF");
-// 	}
-// }
 
 
-
-// registers a function for the signal chain in Max
 void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags)
 {
-	post("DSP ON");
-	post("my sample rate is: %f", samplerate);
-	// AHA: no need to load dll as it is being linked to
-	// if( sv_load_dll() ) {
-	// 	error("cannot load sunvox dll");
-	// 	return;
-	// }
-	// post('sv_load_dll called');
-	int ver = sv_init( 0, samplerate, 2, 0 );
-	if ( ver >= 0) {
-		error("sunvox init failed!");
-	}
-	object_method(dsp64, gensym("dsp_add64"), x, sv_perform64, 0, NULL);
+    // post("sample rate: %f", samplerate);
+    // post("maxvectorsize: %d", maxvectorsize);
+
+	if (x->is_initialized) {
+		post("calling sv_deinit()");
+        sv_close_slot( 0 );
+        sv_deinit();
+    }
+
+    delete[] x->in_sv_buffer;
+    delete[] x->out_sv_buffer;
+
+    x->in_sv_buffer = new float[maxvectorsize * N_IN_CHANNELS];
+    x->out_sv_buffer = new float[maxvectorsize * N_OUT_CHANNELS];
+
+    memset(x->in_sv_buffer, 0.f, sizeof(float) * maxvectorsize * N_IN_CHANNELS);
+    memset(x->out_sv_buffer, 0.f, sizeof(float) * maxvectorsize * N_OUT_CHANNELS);
+
+    int ver = sv_init( 0, 48000, 2, SV_INIT_FLAG_USER_AUDIO_CALLBACK | SV_INIT_FLAG_AUDIO_FLOAT32);
+    if( ver >= 0 )
+    {
+    	x->is_initialized = 1;
+        sv_open_slot( 0 );
+        /*
+        SunVox is initialized.
+        Slot 0 is open and ready for use.
+        Then you can load and play some files in this slot.
+        */
+        post("sv_init successuflly called");
+    } else {
+    	error("sunvox init failed!");
+    }
+    object_method(dsp64, gensym("dsp_add64"), x, sv_perform64, 0, NULL);
 }
 
 
-// this is the 64-bit perform method audio vectors
-void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags, void *userparam)
+void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, 
+                           long sampleframes, long flags, void *userparam)
 {
-	t_double *inL = ins[0];		// we get audio for each inlet of the object from the **ins argument
-	t_double *outL = outs[0];	// we get audio for each outlet of the object from the **outs argument
-	int n = sampleframes;
+    float * in_ptr = x->in_sv_buffer;
+    float * out_ptr = x->out_sv_buffer;
+    int n = sampleframes; // n = 64
 
-	// sv_open_slot(0);
+    if (ins) {
+        for (int i = 0; i < n; i++) {
+            for (int chan = 0; chan < numins; chan++) {
+                *(in_ptr++) = ins[chan][i];
+            }
+        }
+    }
 
-	// this perform method simply copies the input to the output, offsetting the value
-	while (n--)
-		*outL++ = *inL++ + x->offset;
+	// int sv_audio_callback2( void* buf, int frames, int latency, uint32_t out_time, int in_type, int in_channels, void* in_buf ) SUNVOX_FN_ATTR;
+	sv_audio_callback2(x->out_sv_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, n, x->in_sv_buffer );
 
-	// sv_close_slot(0);
-	sv_deinit();
+    for (int i = 0; i < n; i++) {
+        for (int chan = 0; chan < numouts; chan++) {
+            outs[chan][i] = *out_ptr++;
+        }
+    }
 }
 

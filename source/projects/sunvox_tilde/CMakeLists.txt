@@ -64,11 +64,6 @@ add_custom_command(TARGET ${PROJECT_NAME}
     COMMAND mkdir -p ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Frameworks
     COMMAND cp -f ${LIBSUNVOX}
     ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Frameworks/libsunvox.dylib
-
-    # COMMAND cp -af ${CMAKE_CURRENT_SOURCE_DIR}/lib/sunvox.dylib
-    # ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Frameworks/sunvox.dylib
-    # COMMAND cp -af ${LIBSUNVOX}
-    # ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Frameworks/libsunvox.dylib
 )
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../max-sdk-base/script/max-posttarget.cmake)

@@ -144,13 +144,13 @@ int main()
 	if( 1 )
 	{
 	    //load from file:
-	    res = sv_load( 0, "song01.sunvox" );
+	    res = sv_load( 0, "../resources/song01.sunvox" );
 	}
 	else
 	{
 	    //... or load from memory:
 	    size_t file_size = 0;
-	    void* data = load_file( "song01.sunvox", &file_size );
+	    void* data = load_file( "../resources/song01.sunvox", &file_size );
 	    if( data )
 	    {
 		res = sv_load_from_memory( 0, data, file_size );
