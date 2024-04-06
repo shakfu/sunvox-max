@@ -62,8 +62,9 @@ target_link_options(${PROJECT_NAME}
 add_custom_command(TARGET ${PROJECT_NAME} 
     POST_BUILD
     COMMAND mkdir -p ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Frameworks
-    COMMAND cp -f ${LIBSUNVOX}
-    ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Frameworks/libsunvox.dylib
+    COMMAND mkdir -p ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Resources
+    COMMAND cp -f ${LIBSUNVOX} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Frameworks/libsunvox.dylib
+    COMMAND cp -f ${CMAKE_CURRENT_SOURCE_DIR}/resources/* ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Resources
 )
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../max-sdk-base/script/max-posttarget.cmake)
