@@ -26,12 +26,13 @@
 
 // struct to represent the object's state
 typedef struct _sv {
-	t_pxobject		ob;		// the object itself (t_pxobject in MSP instead of t_object)
-	int is_initialized;		// flag to indicate if sv_init has been successfully called
-    int keep_running;       // flag to indicate whether to keep running or not
-	double offset; 	        // the value of a property of our object
-	float *in_sv_buffer;    // intermediate sunvox input buffer
-    float *out_sv_buffer;   // intermediate sunvox output buffer
+	t_pxobject		ob;	       // the object itself (t_pxobject in MSP instead of t_object)
+	int is_initialized;        // flag to indicate if sv_init has been successfully called
+    int keep_running;          // flag to indicate whether to keep running or not
+    const char* resources_dir; // resource directory inside external bundle;
+	double offset; 	           // the value of a property of our object
+	float *in_sv_buffer;       // intermediate sunvox input buffer
+    float *out_sv_buffer;      // intermediate sunvox output buffer
 } t_sv;
 
 
@@ -40,6 +41,7 @@ void *sv_new(t_symbol *s, long argc, t_atom *argv);
 void sv_free(t_sv *x);
 t_max_err sv_bang(t_sv *x);
 t_max_err sv_test(t_sv *x);
+t_string* sv_get_path_to_external(t_class* c, char* subpath);
 void sv_assist(t_sv *x, void *b, long m, long a, char *s);
 void sv_float(t_sv *x, double f);
 void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags);
@@ -71,6 +73,28 @@ void ext_main(void *r)
 	sv_class = c;
 }
 
+t_string* sv_get_path_to_external(t_class* c, char* subpath)
+{
+    char external_path[MAX_PATH_CHARS];
+    char external_name[MAX_PATH_CHARS];
+    short path_id = class_getpath(c);
+    t_string* result;
+
+#ifdef __APPLE__
+    const char* ext_filename = "%s.mxo";
+#else
+    const char* ext_filename = "%s.mxe64";
+#endif
+    snprintf_zero(external_name, MAX_FILENAME_CHARS, ext_filename,
+                  c->c_sym->s_name);
+    path_toabsolutesystempath(path_id, external_name, external_path);
+    result = string_new(external_path);
+    if (subpath != NULL) {
+        string_append(result, subpath);
+    }
+    return result;
+}
+
 
 void *sv_new(t_symbol *s, long argc, t_atom *argv)
 {
@@ -84,7 +108,13 @@ void *sv_new(t_symbol *s, long argc, t_atom *argv)
 		x->is_initialized = 0;
         x->keep_running = 1;        
         x->in_sv_buffer = NULL;
-        x->out_sv_buffer = NULL;		
+        x->out_sv_buffer = NULL;
+#if defined(__APPLE__)
+        x->resources_dir = string_getptr(
+            sv_get_path_to_external(sv_class, "/Contents/Resources"));
+#else
+        x->resources_dir = NULL;
+#endif
 	}
 	return (x);
 }
@@ -141,9 +171,8 @@ void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long ma
     memset(x->in_sv_buffer, 0.f, sizeof(float) * maxvectorsize * N_IN_CHANNELS);
     memset(x->out_sv_buffer, 0.f, sizeof(float) * maxvectorsize * N_OUT_CHANNELS);
 
-    int ver = sv_init( 0, 48000, 2, SV_INIT_FLAG_USER_AUDIO_CALLBACK
-                                    | SV_INIT_FLAG_AUDIO_FLOAT32
-                                    | SV_INIT_FLAG_ONE_THREAD);
+    int ver = sv_init( 0, samplerate, N_OUT_CHANNELS, SV_INIT_FLAG_USER_AUDIO_CALLBACK
+                                                    | SV_INIT_FLAG_AUDIO_FLOAT32);
     if( ver >= 0 )
     {
     	x->is_initialized = 1;
@@ -187,52 +216,6 @@ void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **
 }
 
 
-// void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, 
-//                            long sampleframes, long flags, void *userparam)
-// {
-//     float * in_ptr = x->in_sv_buffer;
-//     float * out_ptr = x->out_sv_buffer;
-//     int n = sampleframes; // n = 64
-
-//     if (ins) {
-//         for (int i = 0; i < n; i++) {
-//             for (int chan = 0; chan < numins; chan++) {
-//                 *(in_ptr++) = ins[chan][i];
-//             }
-//         }
-//     }
-
-// 	// int sv_audio_callback2( void* buf, int frames, int latency, uint32_t out_time, int in_type, int in_channels, void* in_buf ) SUNVOX_FN_ATTR;
-// 	sv_audio_callback2(x->out_sv_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, n, x->in_sv_buffer );
-
-//     for (int i = 0; i < n; i++) {
-//         for (int chan = 0; chan < numouts; chan++) {
-//             outs[chan][i] = *out_ptr++;
-//         }
-//     }
-// }
-
-void* load_file(const char* name, size_t* file_size)
-{
-    void* rv = 0;
-    FILE* f = fopen(name, "rb");
-    if (f) {
-        fseek(f, 0, 2);
-        size_t size = ftell(f); // get file size
-        rewind(f);
-        post("file %s size: %d bytes", name, (int)size);
-        if (size > 0) {
-            rv = malloc(size);
-            if (rv) {
-                fread(rv, 1, size, f);
-                if (file_size)
-                    *file_size = size;
-            }
-        }
-        fclose(f);
-    }
-    return rv;
-}
 
 t_max_err sv_bang(t_sv *x)
 {
@@ -249,9 +232,12 @@ t_max_err sv_test(t_sv *x)
 {
     // signal(SIGINT, int_handler);
 
-    post("Loading SunVox project file...");
+    char path[MAX_PATH_CHARS];
+    snprintf_zero(path, MAX_PATH_CHARS, "%s/%s", x->resources_dir, "song01.sunvox");
+
+    post("Loading SunVox project file: %s", path);
     int res = -1;
-    res = sv_load(0, "/Users/sa/Downloads/song01.sunvox");
+    res = sv_load(0, path);
     if (res == 0)
         post("Loaded.");
     else

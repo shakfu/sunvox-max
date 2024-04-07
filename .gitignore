@@ -1,6 +1,6 @@
 .DS_Store
 build
-
+externals
 
 # Prerequisites
 *.d
