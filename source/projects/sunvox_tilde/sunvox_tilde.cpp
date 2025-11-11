@@ -172,7 +172,8 @@ void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long ma
     memset(x->out_sv_buffer, 0.f, sizeof(float) * maxvectorsize * N_OUT_CHANNELS);
 
     int ver = sv_init( 0, samplerate, N_OUT_CHANNELS, SV_INIT_FLAG_USER_AUDIO_CALLBACK
-                                                    | SV_INIT_FLAG_AUDIO_FLOAT32);
+                                                    | SV_INIT_FLAG_AUDIO_FLOAT32
+                                                    | SV_INIT_FLAG_ONE_THREAD);
     if( ver >= 0 )
     {
     	x->is_initialized = 1;
@@ -206,7 +207,7 @@ void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **
     }
 
     // int sv_audio_callback2( void* buf, int frames, int latency, uint32_t out_time, int in_type, int in_channels, void* in_buf ) SUNVOX_FN_ATTR;
-    sv_audio_callback2(x->out_sv_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, n, x->in_sv_buffer );
+    sv_audio_callback2(x->out_sv_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, N_IN_CHANNELS, x->in_sv_buffer );
 
     for (int i = 0; i < n; i++) {
         for (int chan = 0; chan < numouts; chan++) {
@@ -236,8 +237,12 @@ t_max_err sv_test(t_sv *x)
     snprintf_zero(path, MAX_PATH_CHARS, "%s/%s", x->resources_dir, "song01.sunvox");
 
     post("Loading SunVox project file: %s", path);
+
+    sv_lock_slot(0);
     int res = -1;
     res = sv_load(0, path);
+    sv_unlock_slot(0);
+
     if (res == 0)
         post("Loaded.");
     else

@@ -4,21 +4,13 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/../../max-sdk-base/script/max-pretarget.cmak
 # MAX EXTERNAL
 #############################################################
 
+# Build SunVox static library
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../sunvox_lib ${CMAKE_BINARY_DIR}/sunvox_lib)
 
-include_directories( 
+include_directories(
 	"${MAX_SDK_INCLUDES}"
 	"${MAX_SDK_MSP_INCLUDES}"
 	"${MAX_SDK_JIT_INCLUDES}"
-)
-
-set(LIBSUNVOX 
-	${CMAKE_CURRENT_SOURCE_DIR}/lib/libsunvox.dylib
-)
-
-
-execute_process(
-	COMMAND install_name_tool -id "@loader_path/../Frameworks/libsunvox.dylib"
-		   ${LIBSUNVOX}
 )
 
 file(GLOB PROJECT_SRC
@@ -35,18 +27,21 @@ add_library(
 target_include_directories(${PROJECT_NAME}
 	PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../sunvox_lib/sunvox_lib/headers
 )
 
 target_link_libraries(${PROJECT_NAME}
 	PUBLIC
-	"-lsunvox"
+	sunvox_static
+	"-framework Foundation"
+	"-framework Cocoa"
+	"-framework AudioUnit"
+	"-framework AudioToolbox"
+	"-framework CoreAudio"
+	"-framework CoreFoundation"
+	"-framework OpenGL"
 	"-lstdc++"
-)
-
-
-target_link_directories(${PROJECT_NAME}
-	PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}/lib
+	"-lobjc"
 )
 
 target_compile_options(${PROJECT_NAME}
@@ -59,11 +54,9 @@ target_link_options(${PROJECT_NAME}
 	"-m64"
 )
 
-add_custom_command(TARGET ${PROJECT_NAME} 
+add_custom_command(TARGET ${PROJECT_NAME}
     POST_BUILD
-    COMMAND mkdir -p ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Frameworks
     COMMAND mkdir -p ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Resources
-    COMMAND cp -f ${LIBSUNVOX} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Frameworks/libsunvox.dylib
     COMMAND cp -f ${CMAKE_CURRENT_SOURCE_DIR}/resources/* ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Resources
 )
 
