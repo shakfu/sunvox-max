@@ -1,8 +1,7 @@
 /**
 	@file
-	sv~: a simple audio object for Max
-	original by: jeremy bernstein, jeremy@bootsquad.com
-	@ingroup examples
+	svm_tilde~: an external for the sunvox sound library
+    by: Shakeeb Alireza
 */
 
 #include "ext.h"			// standard Max include, always required (except in Jitter)
@@ -11,7 +10,6 @@
 
 #include <dlfcn.h>
 #include <math.h>
-// #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,11 +23,15 @@
 
 // struct to represent the object's state
 typedef struct _svm {
-	t_pxobject		ob;	       // the object itself (t_pxobject in MSP instead of t_object)
-	int is_initialized;        // flag to indicate if sv_init has been successfully called
-    const char* resources_dir; // resource directory inside external bundle
-	float *in_sv_buffer;       // intermediate sunvox input buffer
-    float *out_sv_buffer;      // intermediate sunvox output buffer
+	t_pxobject		ob;	            // the object itself (t_pxobject in MSP instead of t_object)
+	int is_initialized;             // flag to indicate if sv_init has been successfully called
+    const char* resources_dir;      // resource directory inside external bundle
+    t_symbol* song_filename;        // song filename (e.g song.sunvox) as symbol
+    char filepath[MAX_PATH_CHARS];  // song path (full path) 
+    char filename[MAX_PATH_CHARS];  // song filename
+    short path_id;                  // song path id
+	float *in_svm_buffer;       // intermediate sunvox input buffer
+    float *out_svm_buffer;      // intermediate sunvox output buffer
 } t_svm;
 
 
@@ -37,6 +39,7 @@ typedef struct _svm {
 void *svm_new(t_symbol *s, long argc, t_atom *argv);
 void svm_free(t_svm *x);
 t_string* svm_get_path_to_external(t_class* c, char* subpath);
+bool svm_load_file(t_svm* x);
 void svm_assist(t_svm *x, void *b, long m, long a, char *s);
 void svm_dsp64(t_svm *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags);
 void svm_perform64(t_svm *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags, void *userparam);
@@ -56,10 +59,6 @@ static t_class *svm_class = NULL;
 
 void ext_main(void *r)
 {
-	// object initialization, note the use of dsp_free for the freemethod, which is required
-	// unless you need to free allocated memory, in which case you should call dsp_free from
-	// your custom free function.
-
 	t_class *c = class_new("sunvox~", (method)svm_new, (method)dsp_free, (long)sizeof(t_svm), 0L, A_GIMME, 0);
 
 	class_addmethod(c, (method)svm_load,   "load",     A_SYM,   0);
@@ -107,14 +106,21 @@ void *svm_new(t_symbol *s, long argc, t_atom *argv)
 			outlet_new(x, "signal"); 	// signal outlets for stereo output
 		}
 		x->is_initialized = 0;
-        x->in_sv_buffer = NULL;
-        x->out_sv_buffer = NULL;
+        x->in_svm_buffer = NULL;
+        x->out_svm_buffer = NULL;
 #if defined(__APPLE__)
         x->resources_dir = string_getptr(
             svm_get_path_to_external(svm_class, "/Contents/Resources"));
 #else
         x->resources_dir = NULL;
 #endif
+        x->path_id = 0;
+        // Get song filename (first argument)
+        if (argc > 0 && atom_gettype(argv) == A_SYM) {
+            x->song_filename = atom_getsym(argv);
+        } else {
+            x->song_filename = gensym("");
+        }
 	}
 	return (x);
 }
@@ -122,8 +128,8 @@ void *svm_new(t_symbol *s, long argc, t_atom *argv)
 
 void svm_free(t_svm *x)
 {
-    delete[] x->in_sv_buffer;
-    delete[] x->out_sv_buffer;
+    delete[] x->in_svm_buffer;
+    delete[] x->out_svm_buffer;
     if (x->is_initialized) {
         sv_close_slot(0);
         sv_deinit();
@@ -144,6 +150,44 @@ void svm_assist(t_svm *x, void *b, long m, long a, char *s)
 	}
 }
 
+bool svm_load_file(t_svm* x)
+{
+    char filename[MAX_PATH_CHARS];
+    char filepath[MAX_PATH_CHARS];
+    t_fourcc outtype = 0;
+    short path_id;
+    t_max_err err;
+
+    // post("song_filename: %s", x->song_filename->s_name);
+    strncpy_zero(filename, x->song_filename->s_name, MAX_PATH_CHARS);
+
+    // Locate file in Max search path: (NULL,0 mean any type)
+    if (locatefile_extended(filename, &path_id, &outtype, NULL, 0)) {
+        error("svm_load_file: cannot find file %s", x->song_filename->s_name);
+        return false;
+    }
+
+    // post("outtype: %d", outtype);
+
+    // Get absolute path
+    filepath[0] = '\0';
+    err = path_toabsolutesystempath(path_id, filename, filepath);
+    if (err != MAX_ERR_NONE) {
+        error("svm_load_file: cannot convert %s to absolute path", x->song_filename->s_name);
+        return false;
+    }
+
+    // Store paths
+    x->path_id = path_id;
+    strncpy(x->filepath, filepath, MAX_PATH_CHARS - 1);
+    x->filepath[MAX_PATH_CHARS - 1] = '\0';
+    strncpy(x->filename, filename, MAX_PATH_CHARS - 1);
+    x->filename[MAX_PATH_CHARS - 1] = '\0';
+
+    // find
+    post("file: found %s", filepath);
+    return true;
+}
 
 void svm_load(t_svm *x, t_symbol *s)
 {
@@ -152,28 +196,56 @@ void svm_load(t_svm *x, t_symbol *s)
         return;
     }
 
-    char path[MAX_PATH_CHARS];
-    const char *filename = s->s_name;
+    x->song_filename = s;
 
-    // If filename doesn't contain a path separator, look in resources dir
-    if (strchr(filename, '/') == NULL && x->resources_dir != NULL) {
-        snprintf_zero(path, MAX_PATH_CHARS, "%s/%s", x->resources_dir, filename);
+    if(svm_load_file(x)) {
+        post("sunvox~: loading %s", x->filepath);
     } else {
-        snprintf_zero(path, MAX_PATH_CHARS, "%s", filename);
+        error("sunvox~: could not load");
+        return;
     }
 
-    post("sunvox~: loading %s", path);
-
     sv_lock_slot(0);
-    int res = sv_load(0, path);
+    int res = sv_load(0, x->filepath);
     sv_unlock_slot(0);
 
     if (res == 0) {
         post("sunvox~: loaded '%s'", sv_get_song_name(0));
     } else {
-        error("sunvox~: load error %d for %s", res, path);
+        error("sunvox~: load error %d for %s", res, x->filepath);
     }
 }
+
+
+// void svm_load(t_svm *x, t_symbol *s)
+// {
+//     if (!x->is_initialized) {
+//         error("sunvox~: not initialized, turn on audio first");
+//         return;
+//     }
+
+//     char path[MAX_PATH_CHARS];
+//     const char *filename = s->s_name;
+
+//     // If filename doesn't contain a path separator, look in resources dir
+//     if (strchr(filename, '/') == NULL && x->resources_dir != NULL) {
+//         snprintf_zero(path, MAX_PATH_CHARS, "%s/%s", x->resources_dir, filename);
+//     } else {
+//         snprintf_zero(path, MAX_PATH_CHARS, "%s", filename);
+//     }
+
+//     post("sunvox~: loading %s", path);
+
+//     sv_lock_slot(0);
+//     int res = sv_load(0, path);
+//     sv_unlock_slot(0);
+
+//     if (res == 0) {
+//         post("sunvox~: loaded '%s'", sv_get_song_name(0));
+//     } else {
+//         error("sunvox~: load error %d for %s", res, path);
+//     }
+// }
 
 
 void svm_play(t_svm *x)
@@ -220,14 +292,14 @@ void svm_dsp64(t_svm *x, t_object *dsp64, short *count, double samplerate, long 
         sv_deinit();
     }
 
-    delete[] x->in_sv_buffer;
-    delete[] x->out_sv_buffer;
+    delete[] x->in_svm_buffer;
+    delete[] x->out_svm_buffer;
 
-    x->in_sv_buffer = new float[maxvectorsize * N_IN_CHANNELS];
-    x->out_sv_buffer = new float[maxvectorsize * N_OUT_CHANNELS];
+    x->in_svm_buffer = new float[maxvectorsize * N_IN_CHANNELS];
+    x->out_svm_buffer = new float[maxvectorsize * N_OUT_CHANNELS];
 
-    memset(x->in_sv_buffer, 0.f, sizeof(float) * maxvectorsize * N_IN_CHANNELS);
-    memset(x->out_sv_buffer, 0.f, sizeof(float) * maxvectorsize * N_OUT_CHANNELS);
+    memset(x->in_svm_buffer, 0.f, sizeof(float) * maxvectorsize * N_IN_CHANNELS);
+    memset(x->out_svm_buffer, 0.f, sizeof(float) * maxvectorsize * N_OUT_CHANNELS);
 
     int ver = sv_init( 0, samplerate, N_OUT_CHANNELS, SV_INIT_FLAG_USER_AUDIO_CALLBACK
                                                     | SV_INIT_FLAG_AUDIO_FLOAT32
@@ -252,8 +324,8 @@ void svm_dsp64(t_svm *x, t_object *dsp64, short *count, double samplerate, long 
 void svm_perform64(t_svm *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts,
                            long sampleframes, long flags, void *userparam)
 {
-    float * in_ptr = x->in_sv_buffer;
-    float * out_ptr = x->out_sv_buffer;
+    float * in_ptr = x->in_svm_buffer;
+    float * out_ptr = x->out_svm_buffer;
     int n = sampleframes;
 
     // Interleave input: Max provides separate channel buffers, SunVox expects interleaved
@@ -268,7 +340,7 @@ void svm_perform64(t_svm *x, t_object *dsp64, double **ins, long numins, double 
         }
     }
 
-    sv_audio_callback2(x->out_sv_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, N_IN_CHANNELS, x->in_sv_buffer);
+    sv_audio_callback2(x->out_svm_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, N_IN_CHANNELS, x->in_svm_buffer);
 
     // De-interleave output: SunVox provides interleaved, Max expects separate channel buffers
     for (int i = 0; i < n; i++) {

@@ -1,20 +1,21 @@
 # sunvox-max
 
-A buggy Max/MSP external which embeds the [sunvox](https://www.warmplace.ru/soft/sunvox/sunvox_lib.php) engine.
+Am Max/MSP external which embeds the [sunvox](https://www.warmplace.ru/soft/sunvox/sunvox_lib.php) engine.
 
 
 ## Status
 
-Test outputs correctly but with blocking audio output. Clearly this needs to be fixed.
+Working proof-of-concept with the following methods:
 
-## Usage
+- `load <song.sunvox>`: loads the sunvox song
+- `play`: plays the sunvox song
+- `stop`: stops playing
+- `volume <val>`: set volume (0-256)
 
-
-To test (only macOS):
+## To Build
 
 ```bash
 make setup
 make
 ```
-
 
