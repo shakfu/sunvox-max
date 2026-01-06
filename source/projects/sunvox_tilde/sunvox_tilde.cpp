@@ -24,14 +24,17 @@
 // struct to represent the object's state
 typedef struct _svm {
 	t_pxobject		ob;	            // the object itself (t_pxobject in MSP instead of t_object)
-	int is_initialized;             // flag to indicate if sv_init has been successfully called
+    int is_initialized;             // flag to indicate if sv_init has been successfully called
+    int is_loaded;                  // flag to indicate if a song is loaded
+    int is_playing;                 // flag to track play state (for pause/resume)
     const char* resources_dir;      // resource directory inside external bundle
     t_symbol* song_filename;        // song filename (e.g song.sunvox) as symbol
     char filepath[MAX_PATH_CHARS];  // song path (full path) 
     char filename[MAX_PATH_CHARS];  // song filename
     short path_id;                  // song path id
-	float *in_svm_buffer;       // intermediate sunvox input buffer
-    float *out_svm_buffer;      // intermediate sunvox output buffer
+	float *in_svm_buffer;           // intermediate sunvox input buffer
+    float *out_svm_buffer;          // intermediate sunvox output buffer
+    int last_line;                  // last reported line (to detect song end)
 } t_svm;
 
 
@@ -49,6 +52,7 @@ void svm_load(t_svm *x, t_symbol *s);
 void svm_play(t_svm *x);
 void svm_stop(t_svm *x);
 void svm_volume(t_svm *x, long vol);
+void svm_note(t_svm *x, t_symbol *s, long argc, t_atom *argv);
 
 
 // global class pointer variable
@@ -65,6 +69,7 @@ void ext_main(void *r)
 	class_addmethod(c, (method)svm_play,   "play",              0);
 	class_addmethod(c, (method)svm_stop,   "stop",              0);
 	class_addmethod(c, (method)svm_volume, "volume",   A_LONG,  0);
+    class_addmethod(c, (method)svm_note,   "note",     A_GIMME, 0);
 	class_addmethod(c, (method)svm_dsp64,  "dsp64",    A_CANT,  0);
 	class_addmethod(c, (method)svm_assist, "assist",   A_CANT,  0);
 
@@ -105,7 +110,10 @@ void *svm_new(t_symbol *s, long argc, t_atom *argv)
 		for (int i = 0; i < N_OUT_CHANNELS; i++) {
 			outlet_new(x, "signal"); 	// signal outlets for stereo output
 		}
-		x->is_initialized = 0;
+        x->is_initialized = 0;
+        x->is_loaded = 0;
+        x->is_playing = 0;
+        x->last_line = -1;
         x->in_svm_buffer = NULL;
         x->out_svm_buffer = NULL;
 #if defined(__APPLE__)
@@ -189,6 +197,8 @@ bool svm_load_file(t_svm* x)
     return true;
 }
 
+
+
 void svm_load(t_svm *x, t_symbol *s)
 {
     if (!x->is_initialized) {
@@ -210,8 +220,12 @@ void svm_load(t_svm *x, t_symbol *s)
     sv_unlock_slot(0);
 
     if (res == 0) {
+        x->is_loaded = 1;
+        x->is_playing = 0;
+        x->last_line = -1;
         post("sunvox~: loaded '%s'", sv_get_song_name(0));
     } else {
+        x->is_loaded = 0;
         error("sunvox~: load error %d for %s", res, x->filepath);
     }
 }
@@ -247,14 +261,22 @@ void svm_load(t_svm *x, t_symbol *s)
 //     }
 // }
 
-
 void svm_play(t_svm *x)
 {
     if (!x->is_initialized) {
         error("sunvox~: not initialized, turn on audio first");
         return;
     }
+    if (!x->is_loaded) {
+        error("sunvox~: no song loaded");
+        return;
+    }
+    post("sunvox~: starting playback...");
     sv_play_from_beginning(0);
+    x->is_playing = 1;
+    x->last_line = -1;
+    // Check if playback started
+    post("sunvox~: playing, current line = %d", sv_get_current_line(0));
 }
 
 
@@ -278,6 +300,61 @@ void svm_volume(t_svm *x, long vol)
     if (vol < 0) vol = 0;
     if (vol > 256) vol = 256;
     sv_volume(0, (int)vol);
+}
+
+
+void svm_note(t_svm *x, t_symbol *s, long argc, t_atom *argv)
+{
+    // Usage: note <module> <note> [velocity] [track]
+    // module: module number or name
+    // note: MIDI note number (0-127) or -1 for note off
+    // velocity: 1-129 (default 129)
+    // track: track number (default 0)
+
+    if (!x->is_initialized) {
+        error("sunvox~: not initialized");
+        return;
+    }
+    if (argc < 2) {
+        error("sunvox~: note requires at least module and note arguments");
+        return;
+    }
+
+    int module = 0;
+    int note = 0;
+    int velocity = 129;  // Max velocity
+    int track = 0;
+
+    // Get module (can be number or name)
+    if (atom_gettype(argv) == A_LONG) {
+        module = (int)atom_getlong(argv) + 1;  // SunVox modules are 1-indexed in events
+    } else if (atom_gettype(argv) == A_SYM) {
+        module = sv_find_module(0, atom_getsym(argv)->s_name) + 1;
+        if (module <= 0) {
+            error("sunvox~: module '%s' not found", atom_getsym(argv)->s_name);
+            return;
+        }
+    }
+
+    // Get note
+    note = (int)atom_getlong(argv + 1);
+    if (note < 0) {
+        note = NOTECMD_NOTE_OFF;
+    }
+
+    // Optional velocity
+    if (argc > 2) {
+        velocity = (int)atom_getlong(argv + 2);
+        if (velocity < 1) velocity = 1;
+        if (velocity > 129) velocity = 129;
+    }
+
+    // Optional track
+    if (argc > 3) {
+        track = (int)atom_getlong(argv + 3);
+    }
+
+    sv_send_event(0, track, note, velocity, module, 0, 0);
 }
 
 
