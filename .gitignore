@@ -34,3 +34,9 @@ externals
 *.exe
 *.out
 *.app
+
+# agents
+.claude
+CLAUDE.md
+AGENTS.md
+GEMINI.md

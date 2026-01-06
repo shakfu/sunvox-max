@@ -5,7 +5,7 @@ A buggy Max/MSP external which embeds the [sunvox](https://www.warmplace.ru/soft
 
 ## Status
 
-Test outputs correct but crappy audio output which is probably due to incorrect audio processing (interleaving?), the audio bypasses Max, and this needs to be fixed.
+Test outputs correctly but with blocking audio output. Clearly this needs to be fixed.
 
 ## Usage
 

@@ -101,9 +101,10 @@ void *sv_new(t_symbol *s, long argc, t_atom *argv)
 	t_sv *x = (t_sv *)object_alloc(sv_class);
 
 	if (x) {
-		dsp_setup((t_pxobject *)x, 1);	// MSP inlets: arg is # of inlets and is REQUIRED!
-		// use 0 if you don't need inlets
-		outlet_new(x, "signal"); 		// signal outlet (note "signal" rather than NULL)
+		dsp_setup((t_pxobject *)x, N_IN_CHANNELS);	// MSP inlets: stereo input
+		for (int i = 0; i < N_OUT_CHANNELS; i++) {
+			outlet_new(x, "signal"); 	// signal outlets for stereo output
+		}
 		x->offset = 0.0;
 		x->is_initialized = 0;
         x->keep_running = 1;        
@@ -191,27 +192,35 @@ void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long ma
 }
 
 
-void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, 
+void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts,
                            long sampleframes, long flags, void *userparam)
 {
     float * in_ptr = x->in_sv_buffer;
     float * out_ptr = x->out_sv_buffer;
-    int n = sampleframes; // n = 64
+    int n = sampleframes;
 
-    if (ins) {
-        for (int i = 0; i < n; i++) {
-            for (int chan = 0; chan < numins; chan++) {
-                *(in_ptr++) = ins[chan][i];
+    // Interleave input: Max provides separate channel buffers, SunVox expects interleaved
+    // Buffer format: L0, R0, L1, R1, L2, R2, ...
+    for (int i = 0; i < n; i++) {
+        for (int chan = 0; chan < N_IN_CHANNELS; chan++) {
+            if (chan < numins) {
+                *(in_ptr++) = (float)ins[chan][i];
+            } else {
+                *(in_ptr++) = 0.0f;
             }
         }
     }
 
-    // int sv_audio_callback2( void* buf, int frames, int latency, uint32_t out_time, int in_type, int in_channels, void* in_buf ) SUNVOX_FN_ATTR;
-    sv_audio_callback2(x->out_sv_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, N_IN_CHANNELS, x->in_sv_buffer );
+    sv_audio_callback2(x->out_sv_buffer, n, LATENCY, sv_get_ticks(), FLOAT32_TYPE, N_IN_CHANNELS, x->in_sv_buffer);
 
+    // De-interleave output: SunVox provides interleaved, Max expects separate channel buffers
     for (int i = 0; i < n; i++) {
-        for (int chan = 0; chan < numouts; chan++) {
-            outs[chan][i] = *out_ptr++;
+        for (int chan = 0; chan < N_OUT_CHANNELS; chan++) {
+            if (chan < numouts) {
+                outs[chan][i] = (double)(*out_ptr++);
+            } else {
+                out_ptr++;
+            }
         }
     }
 }
