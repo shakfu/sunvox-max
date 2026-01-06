@@ -24,32 +24,32 @@
 #define LATENCY 0
 
 // struct to represent the object's state
-typedef struct _sv {
+typedef struct _svm {
 	t_pxobject		ob;	       // the object itself (t_pxobject in MSP instead of t_object)
 	int is_initialized;        // flag to indicate if sv_init has been successfully called
     const char* resources_dir; // resource directory inside external bundle
 	float *in_sv_buffer;       // intermediate sunvox input buffer
     float *out_sv_buffer;      // intermediate sunvox output buffer
-} t_sv;
+} t_svm;
 
 
 // method prototypes
-void *sv_new(t_symbol *s, long argc, t_atom *argv);
-void sv_free(t_sv *x);
-t_string* sv_get_path_to_external(t_class* c, char* subpath);
-void sv_assist(t_sv *x, void *b, long m, long a, char *s);
-void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags);
-void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags, void *userparam);
+void *svm_new(t_symbol *s, long argc, t_atom *argv);
+void svm_free(t_svm *x);
+t_string* svm_get_path_to_external(t_class* c, char* subpath);
+void svm_assist(t_svm *x, void *b, long m, long a, char *s);
+void svm_dsp64(t_svm *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags);
+void svm_perform64(t_svm *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags, void *userparam);
 
 // message handlers
-void svmax_load(t_sv *x, t_symbol *s);
-void svmax_play(t_sv *x);
-void svmax_stop(t_sv *x);
-void svmax_volume(t_sv *x, long vol);
+void svm_load(t_svm *x, t_symbol *s);
+void svm_play(t_svm *x);
+void svm_stop(t_svm *x);
+void svm_volume(t_svm *x, long vol);
 
 
 // global class pointer variable
-static t_class *sv_class = NULL;
+static t_class *svm_class = NULL;
 
 
 //***********************************************************************************************
@@ -60,21 +60,21 @@ void ext_main(void *r)
 	// unless you need to free allocated memory, in which case you should call dsp_free from
 	// your custom free function.
 
-	t_class *c = class_new("sunvox~", (method)sv_new, (method)dsp_free, (long)sizeof(t_sv), 0L, A_GIMME, 0);
+	t_class *c = class_new("sunvox~", (method)svm_new, (method)dsp_free, (long)sizeof(t_svm), 0L, A_GIMME, 0);
 
-	class_addmethod(c, (method)svmax_load,   "load",     A_SYM,   0);
-	class_addmethod(c, (method)svmax_play,   "play",              0);
-	class_addmethod(c, (method)svmax_stop,   "stop",              0);
-	class_addmethod(c, (method)svmax_volume, "volume",   A_LONG,  0);
-	class_addmethod(c, (method)sv_dsp64,    "dsp64",    A_CANT,  0);
-	class_addmethod(c, (method)sv_assist,   "assist",   A_CANT,  0);
+	class_addmethod(c, (method)svm_load,   "load",     A_SYM,   0);
+	class_addmethod(c, (method)svm_play,   "play",              0);
+	class_addmethod(c, (method)svm_stop,   "stop",              0);
+	class_addmethod(c, (method)svm_volume, "volume",   A_LONG,  0);
+	class_addmethod(c, (method)svm_dsp64,  "dsp64",    A_CANT,  0);
+	class_addmethod(c, (method)svm_assist, "assist",   A_CANT,  0);
 
 	class_dspinit(c);
 	class_register(CLASS_BOX, c);
-	sv_class = c;
+	svm_class = c;
 }
 
-t_string* sv_get_path_to_external(t_class* c, char* subpath)
+t_string* svm_get_path_to_external(t_class* c, char* subpath)
 {
     char external_path[MAX_PATH_CHARS];
     char external_name[MAX_PATH_CHARS];
@@ -97,9 +97,9 @@ t_string* sv_get_path_to_external(t_class* c, char* subpath)
 }
 
 
-void *sv_new(t_symbol *s, long argc, t_atom *argv)
+void *svm_new(t_symbol *s, long argc, t_atom *argv)
 {
-	t_sv *x = (t_sv *)object_alloc(sv_class);
+	t_svm *x = (t_svm *)object_alloc(svm_class);
 
 	if (x) {
 		dsp_setup((t_pxobject *)x, N_IN_CHANNELS);	// MSP inlets: stereo input
@@ -111,7 +111,7 @@ void *sv_new(t_symbol *s, long argc, t_atom *argv)
         x->out_sv_buffer = NULL;
 #if defined(__APPLE__)
         x->resources_dir = string_getptr(
-            sv_get_path_to_external(sv_class, "/Contents/Resources"));
+            svm_get_path_to_external(svm_class, "/Contents/Resources"));
 #else
         x->resources_dir = NULL;
 #endif
@@ -120,7 +120,7 @@ void *sv_new(t_symbol *s, long argc, t_atom *argv)
 }
 
 
-void sv_free(t_sv *x)
+void svm_free(t_svm *x)
 {
     delete[] x->in_sv_buffer;
     delete[] x->out_sv_buffer;
@@ -134,7 +134,7 @@ void sv_free(t_sv *x)
 
 
 
-void sv_assist(t_sv *x, void *b, long m, long a, char *s)
+void svm_assist(t_svm *x, void *b, long m, long a, char *s)
 {
 	if (m == ASSIST_INLET) { //inlet
 		sprintf(s, "I am inlet %ld", a);
@@ -145,7 +145,7 @@ void sv_assist(t_sv *x, void *b, long m, long a, char *s)
 }
 
 
-void svmax_load(t_sv *x, t_symbol *s)
+void svm_load(t_svm *x, t_symbol *s)
 {
     if (!x->is_initialized) {
         error("sunvox~: not initialized, turn on audio first");
@@ -176,7 +176,7 @@ void svmax_load(t_sv *x, t_symbol *s)
 }
 
 
-void svmax_play(t_sv *x)
+void svm_play(t_svm *x)
 {
     if (!x->is_initialized) {
         error("sunvox~: not initialized, turn on audio first");
@@ -186,7 +186,7 @@ void svmax_play(t_sv *x)
 }
 
 
-void svmax_stop(t_sv *x)
+void svm_stop(t_svm *x)
 {
     if (!x->is_initialized) {
         error("sunvox~: not initialized");
@@ -196,7 +196,7 @@ void svmax_stop(t_sv *x)
 }
 
 
-void svmax_volume(t_sv *x, long vol)
+void svm_volume(t_svm *x, long vol)
 {
     if (!x->is_initialized) {
         error("sunvox~: not initialized, turn on audio first");
@@ -209,7 +209,7 @@ void svmax_volume(t_sv *x, long vol)
 }
 
 
-void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags)
+void svm_dsp64(t_svm *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags)
 {
     // post("sample rate: %f", samplerate);
     // post("maxvectorsize: %d", maxvectorsize);
@@ -245,11 +245,11 @@ void sv_dsp64(t_sv *x, t_object *dsp64, short *count, double samplerate, long ma
     } else {
     	error("sunvox init failed!");
     }
-    object_method(dsp64, gensym("dsp_add64"), x, sv_perform64, 0, NULL);
+    object_method(dsp64, gensym("dsp_add64"), x, svm_perform64, 0, NULL);
 }
 
 
-void sv_perform64(t_sv *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts,
+void svm_perform64(t_svm *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts,
                            long sampleframes, long flags, void *userparam)
 {
     float * in_ptr = x->in_sv_buffer;
