@@ -274,12 +274,12 @@ void *svm_new(t_symbol *s, long argc, t_atom *argv)
 	if (x) {
 		dsp_setup((t_pxobject *)x, N_IN_CHANNELS);	// MSP inlets: stereo input
 
-        // Create info outlet first (rightmost)
+        // Create info outlet first (rightmost, outlet 2)
         x->info_outlet = outlet_new((t_object *)x, NULL);
 
-        // Then create signal outlets (left to right: L, R)
+        // Create signal outlets after (outlets 1, 0 from right to left)
 		for (int i = 0; i < N_OUT_CHANNELS; i++) {
-			outlet_new(x, "signal"); 	// signal outlets for stereo output
+			outlet_new(x, "signal");
 		}
 
         x->is_initialized = 0;
