@@ -20,14 +20,18 @@
 //      thread 1: sv_lock_slot(0); sv_get_module_flags(0,mod1); sv_unlock_slot(0);
 //      thread 2: sv_lock_slot(0); sv_remove_module(0,mod2); sv_unlock_slot(0);
 
-#ifdef OS_WIN
-    #define SUNVOX_EXPORT extern "C" __declspec(dllexport) __stdcall
-#endif
-#if defined(OS_APPLE) || defined(OS_LINUX) || defined(OS_EMSCRIPTEN)
-    #define SUNVOX_EXPORT extern "C"
-#endif
 #ifndef SUNVOX_EXPORT
-    #define SUNVOX_EXPORT
+    #ifdef OS_WIN
+        #ifdef SUNVOX_STATIC_LIB
+            #define SUNVOX_EXPORT extern "C"
+        #else
+            #define SUNVOX_EXPORT extern "C" __declspec(dllexport)
+        #endif
+    #elif defined(OS_APPLE) || defined(OS_LINUX) || defined(OS_EMSCRIPTEN)
+        #define SUNVOX_EXPORT extern "C"
+    #else
+        #define SUNVOX_EXPORT
+    #endif
 #endif
 
 const char* g_app_config[] = { "1:/sunvox_dll_config.ini", "2:/sunvox_dll_config.ini", "0" };

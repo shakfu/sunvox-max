@@ -18,6 +18,7 @@ endif()
 add_definitions(
     -DMIN_SAMPLE_RATE=44100
     -DSUNVOX_LIB
+    -DSUNVOX_STATIC_LIB
     -DNOVIDEO
     -DNOVCAP
     -DNOLIST
