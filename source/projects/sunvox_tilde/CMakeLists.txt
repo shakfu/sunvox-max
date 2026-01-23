@@ -61,11 +61,13 @@ elseif(WIN32)
 		PUBLIC
 		winmm
 	)
-	# Copy sunvox.dll to externals folder
+	# Copy sunvox.dll to support folder (Max package convention for shared libraries)
+	set(SUPPORT_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/../support")
 	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E make_directory "${SUPPORT_DIR}"
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
 			"${SUNVOX_LIB}/sunvox_lib/windows/lib_x86_64/sunvox.dll"
-			"${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+			"${SUPPORT_DIR}/sunvox.dll"
 	)
 endif()
 

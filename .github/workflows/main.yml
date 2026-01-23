@@ -71,10 +71,10 @@ jobs:
           Write-Error "External not found"
           exit 1
         }
-        if (Test-Path "externals/sunvox.dll") {
-          Write-Host "sunvox.dll found"
+        if (Test-Path "support/sunvox.dll") {
+          Write-Host "sunvox.dll found in support/"
         } else {
-          Write-Error "sunvox.dll not found - required for Windows"
+          Write-Error "sunvox.dll not found in support/ - required for Windows"
           exit 1
         }
 
@@ -92,6 +92,7 @@ jobs:
         if [ -d docs ]; then cp -a docs "${PACKAGE_NAME}"; fi
         # Copy Max package contents
         if [ -d externals ]; then cp -a externals "${PACKAGE_NAME}"; fi
+        if [ -d support ]; then cp -a support "${PACKAGE_NAME}"; fi
         if [ -d help ]; then cp -a help "${PACKAGE_NAME}"; fi
         if [ -d extras ]; then cp -a extras "${PACKAGE_NAME}"; fi
         if [ -d examples ]; then cp -a examples "${PACKAGE_NAME}"; fi
@@ -118,6 +119,7 @@ jobs:
         if (Test-Path "docs") { Copy-Item -Recurse "docs" $pkg }
         # Copy Max package contents
         if (Test-Path "externals") { Copy-Item -Recurse "externals" $pkg }
+        if (Test-Path "support") { Copy-Item -Recurse "support" $pkg }
         if (Test-Path "help") { Copy-Item -Recurse "help" $pkg }
         if (Test-Path "extras") { Copy-Item -Recurse "extras" $pkg }
         if (Test-Path "examples") { Copy-Item -Recurse "examples" $pkg }
