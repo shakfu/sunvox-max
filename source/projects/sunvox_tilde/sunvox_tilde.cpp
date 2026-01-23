@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SUNVOX_STATIC_LIB
+// SUNVOX_STATIC_LIB or SUNVOX_MAIN defined by CMake
 #include <sunvox.h>
 
 #define N_IN_CHANNELS 2
@@ -140,6 +140,14 @@ static t_class *svm_class = NULL;
 
 void ext_main(void *r)
 {
+#ifdef SUNVOX_MAIN
+    // Windows: Load SunVox DLL at runtime
+    if (sv_load_dll()) {
+        error("sunvox~: failed to load sunvox.dll");
+        return;
+    }
+#endif
+
 	t_class *c = class_new("sunvox~", (method)svm_new, (method)svm_free, (long)sizeof(t_svm), 0L, A_GIMME, 0);
 
     // File I/O

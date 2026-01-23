@@ -71,6 +71,12 @@ jobs:
           Write-Error "External not found"
           exit 1
         }
+        if (Test-Path "externals/sunvox.dll") {
+          Write-Host "sunvox.dll found"
+        } else {
+          Write-Error "sunvox.dll not found - required for Windows"
+          exit 1
+        }
 
     - name: Package (macOS)
       if: matrix.os == 'macos-latest'

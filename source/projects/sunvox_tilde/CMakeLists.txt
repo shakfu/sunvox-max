@@ -6,9 +6,6 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/../../max-sdk-base/script/max-pretarget.cmak
 
 set(SUNVOX_LIB ${CMAKE_CURRENT_SOURCE_DIR}/../sunvox_lib)
 
-# Build SunVox static library
-add_subdirectory(${SUNVOX_LIB} ${CMAKE_BINARY_DIR}/sunvox_lib)
-
 include_directories(
 	"${MAX_SDK_INCLUDES}"
 	"${MAX_SDK_MSP_INCLUDES}"
@@ -20,8 +17,8 @@ file(GLOB PROJECT_SRC
 	 "*.c"
      "*.cpp"
 )
-add_library( 
-	${PROJECT_NAME} 
+add_library(
+	${PROJECT_NAME}
 	MODULE
 	${PROJECT_SRC}
 )
@@ -32,14 +29,13 @@ target_include_directories(${PROJECT_NAME}
 	${SUNVOX_LIB}/sunvox_lib/headers
 )
 
-target_link_libraries(${PROJECT_NAME}
-	PUBLIC
-	sunvox_static
-)
-
 if(APPLE)
+	# macOS: Build and link static library from source
+	add_subdirectory(${SUNVOX_LIB} ${CMAKE_BINARY_DIR}/sunvox_lib)
+	target_compile_definitions(${PROJECT_NAME} PRIVATE SUNVOX_STATIC_LIB)
 	target_link_libraries(${PROJECT_NAME}
 		PUBLIC
+		sunvox_static
 		"-framework Foundation"
 		"-framework Cocoa"
 		"-framework AudioUnit"
@@ -59,11 +55,17 @@ if(APPLE)
 		"-m64"
 	)
 elseif(WIN32)
+	# Windows: Use prebuilt DLL with runtime loading
+	target_compile_definitions(${PROJECT_NAME} PRIVATE SUNVOX_MAIN)
 	target_link_libraries(${PROJECT_NAME}
 		PUBLIC
 		winmm
-		dsound
-		ole32
+	)
+	# Copy sunvox.dll to externals folder
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			"${SUNVOX_LIB}/sunvox_lib/windows/lib_x86_64/sunvox.dll"
+			"${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
 	)
 endif()
 

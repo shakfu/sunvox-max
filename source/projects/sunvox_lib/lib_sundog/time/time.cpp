@@ -301,7 +301,7 @@ stime_ticks_t stime_ticks_per_second()
     return g_ticks_per_second_norm;
 }
 #endif
-#ifdef OS_WIN
+#if defined(OS_WIN) && defined(__GNUC__)
 stime_ticks_t __attribute__ ((force_align_arg_pointer)) stime_ticks()
 #else
 stime_ticks_t stime_ticks()
