@@ -19,6 +19,9 @@ externals
 *.so
 # *.dylib
 *.dll
+# Exception: SunVox prebuilt Windows DLLs
+!source/projects/sunvox_lib/sunvox_lib/windows/lib_x86_64/sunvox.dll
+!source/projects/sunvox_lib/sunvox_lib/windows/lib_x86/sunvox.dll
 
 # Fortran module files
 *.mod
