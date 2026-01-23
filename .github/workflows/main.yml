@@ -1,0 +1,193 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        config: [Release]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: '0'
+
+    - uses: benjlevesque/short-sha@v3
+      id: short-sha
+      with:
+        length: 7
+
+    - name: Install dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake
+
+    - name: Configure (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        mkdir -p build
+        cd build
+        cmake -G Xcode ..
+
+    - name: Configure (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+
+    - name: Build
+      run: |
+        cmake --build build --config ${{ matrix.config }}
+
+    - name: Sign (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        codesign -s "-" -f externals/sunvox~.mxo/Contents/MacOS/sunvox~
+
+    - name: Verify build (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        test -d externals/sunvox~.mxo
+        codesign -vv externals/sunvox~.mxo
+
+    - name: Verify build (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        if (Test-Path "externals/sunvox~.mxe64") {
+          Write-Host "Build successful: externals/sunvox~.mxe64"
+        } else {
+          Write-Error "External not found"
+          exit 1
+        }
+
+    - name: Package (macOS)
+      if: matrix.os == 'macos-latest'
+      env:
+        PACKAGE_NAME: ${{ github.event.repository.name }}
+      run: |
+        mkdir -p "${PACKAGE_NAME}"
+        # Copy package metadata
+        if [ -e package-info.json ]; then cp package-info.json "${PACKAGE_NAME}"; fi
+        if [ -e icon.png ]; then cp icon.png "${PACKAGE_NAME}"; fi
+        # Copy documentation
+        for f in *.md; do [ -e "$f" ] && cp "$f" "${PACKAGE_NAME}"; done
+        if [ -d docs ]; then cp -a docs "${PACKAGE_NAME}"; fi
+        # Copy Max package contents
+        if [ -d externals ]; then cp -a externals "${PACKAGE_NAME}"; fi
+        if [ -d help ]; then cp -a help "${PACKAGE_NAME}"; fi
+        if [ -d extras ]; then cp -a extras "${PACKAGE_NAME}"; fi
+        if [ -d examples ]; then cp -a examples "${PACKAGE_NAME}"; fi
+        if [ -d media ]; then cp -a media "${PACKAGE_NAME}"; fi
+        if [ -d patchers ]; then cp -a patchers "${PACKAGE_NAME}"; fi
+        if [ -d init ]; then cp -a init "${PACKAGE_NAME}"; fi
+        # List package contents
+        echo "Package contents:"
+        ls -la "${PACKAGE_NAME}"
+
+    - name: Package (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      env:
+        PACKAGE_NAME: ${{ github.event.repository.name }}
+      run: |
+        $pkg = $env:PACKAGE_NAME
+        New-Item -ItemType Directory -Force -Path $pkg
+        # Copy package metadata
+        if (Test-Path "package-info.json") { Copy-Item "package-info.json" $pkg }
+        if (Test-Path "icon.png") { Copy-Item "icon.png" $pkg }
+        # Copy documentation
+        Get-ChildItem -Filter "*.md" | Copy-Item -Destination $pkg
+        if (Test-Path "docs") { Copy-Item -Recurse "docs" $pkg }
+        # Copy Max package contents
+        if (Test-Path "externals") { Copy-Item -Recurse "externals" $pkg }
+        if (Test-Path "help") { Copy-Item -Recurse "help" $pkg }
+        if (Test-Path "extras") { Copy-Item -Recurse "extras" $pkg }
+        if (Test-Path "examples") { Copy-Item -Recurse "examples" $pkg }
+        if (Test-Path "media") { Copy-Item -Recurse "media" $pkg }
+        if (Test-Path "patchers") { Copy-Item -Recurse "patchers" $pkg }
+        if (Test-Path "init") { Copy-Item -Recurse "init" $pkg }
+        # List package contents
+        Write-Host "Package contents:"
+        Get-ChildItem -Recurse $pkg
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ github.event.repository.name }}-${{ steps.short-sha.outputs.sha }}-${{ matrix.config }}-${{ matrix.os }}
+        path: ${{ github.event.repository.name }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+    - uses: benjlevesque/short-sha@v3
+      id: short-sha
+      with:
+        length: 7
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: ${{ github.event.repository.name }}-${{ steps.short-sha.outputs.sha }}-Release-macos-latest
+        path: ${{ github.event.repository.name }}-macos
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: ${{ github.event.repository.name }}-${{ steps.short-sha.outputs.sha }}-Release-windows-latest
+        path: ${{ github.event.repository.name }}-windows
+
+    - name: Display package contents
+      run: |
+        echo "=== macOS package ==="
+        ls -laR ${{ github.event.repository.name }}-macos
+        echo "=== Windows package ==="
+        ls -laR ${{ github.event.repository.name }}-windows
+
+    - name: Create zips
+      run: |
+        zip -r ${{ github.event.repository.name }}-${{ github.ref_name }}-macos.zip ${{ github.event.repository.name }}-macos
+        zip -r ${{ github.event.repository.name }}-${{ github.ref_name }}-windows.zip ${{ github.event.repository.name }}-windows
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ github.event.repository.name }}-${{ github.ref_name }}-release
+        path: |
+          ${{ github.event.repository.name }}-${{ github.ref_name }}-macos.zip
+          ${{ github.event.repository.name }}-${{ github.ref_name }}-windows.zip
+
+    - uses: ncipollo/release-action@v1
+      with:
+        artifacts: |
+          ${{ github.event.repository.name }}-${{ github.ref_name }}-macos.zip
+          ${{ github.event.repository.name }}-${{ github.ref_name }}-windows.zip
+        body: |
+          ## Installation
+
+          ### macOS
+          1. Download and unzip `${{ github.event.repository.name }}-${{ github.ref_name }}-macos.zip`
+          2. Move the `${{ github.event.repository.name }}-macos` folder to `~/Documents/Max 8/Packages/` or `~/Documents/Max 9/Packages/`
+          3. Restart Max
+
+          ### Windows
+          1. Download and unzip `${{ github.event.repository.name }}-${{ github.ref_name }}-windows.zip`
+          2. Move the `${{ github.event.repository.name }}-windows` folder to `Documents/Max 8/Packages/` or `Documents/Max 9/Packages/`
+          3. Restart Max
+
+          See README.md for usage instructions.
+        token: ${{ secrets.GITHUB_TOKEN }}
+        draft: false
+        prerelease: ${{ contains(github.ref_name, '-') }}

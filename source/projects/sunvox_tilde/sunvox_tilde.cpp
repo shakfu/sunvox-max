@@ -8,7 +8,6 @@
 #include "ext_obex.h"		// required for "new" style objects
 #include "z_dsp.h"			// required for MSP objects
 
-#include <dlfcn.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>

@@ -125,11 +125,29 @@ list(FILTER ALL_SOURCES EXCLUDE REGEX ".*test.*")
 list(FILTER ALL_SOURCES EXCLUDE REGEX ".*example.*")
 list(FILTER ALL_SOURCES EXCLUDE REGEX ".*android.*")
 list(FILTER ALL_SOURCES EXCLUDE REGEX ".*ios.*")
-list(FILTER ALL_SOURCES EXCLUDE REGEX ".*win.*")
 list(FILTER ALL_SOURCES EXCLUDE REGEX ".*wince.*")
-list(FILTER ALL_SOURCES EXCLUDE REGEX ".*linux.*")
 list(FILTER ALL_SOURCES EXCLUDE REGEX ".*/main/macos/.*")
 list(FILTER ALL_SOURCES EXCLUDE REGEX ".*/main/ios/.*")
+
+# Platform-specific exclusions
+if(APPLE)
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*_win\\..*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*/win/.*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*_linux\\..*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*/linux/.*")
+elseif(WIN32)
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*_macos\\..*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*/macos/.*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*_linux\\..*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*/linux/.*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*\\.mm$")
+elseif(UNIX)
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*_win\\..*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*/win/.*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*_macos\\..*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*/macos/.*")
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ".*\\.mm$")
+endif()
 
 # Create static library
 add_library(sunvox_static STATIC ${ALL_SOURCES})
@@ -164,6 +182,19 @@ if(APPLE)
         "-framework CoreAudio"
         "-framework CoreFoundation"
         "-framework OpenGL"
+    )
+elseif(WIN32)
+    target_compile_definitions(sunvox_static PRIVATE
+        MAKE_WITHOUT_GUI=1
+        MAKE_WITHOUT_MAIN=1
+        _CRT_SECURE_NO_WARNINGS
+        NOMINMAX
+    )
+
+    target_link_libraries(sunvox_static PUBLIC
+        winmm
+        dsound
+        ole32
     )
 endif()
 

@@ -35,33 +35,44 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
 	PUBLIC
 	sunvox_static
-	"-framework Foundation"
-	"-framework Cocoa"
-	"-framework AudioUnit"
-	"-framework AudioToolbox"
-	"-framework CoreAudio"
-	"-framework CoreFoundation"
-	"-framework OpenGL"
-	"-lstdc++"
-	"-lobjc"
 )
 
-target_compile_options(${PROJECT_NAME}
-	PUBLIC
-	"-m64"
-)
+if(APPLE)
+	target_link_libraries(${PROJECT_NAME}
+		PUBLIC
+		"-framework Foundation"
+		"-framework Cocoa"
+		"-framework AudioUnit"
+		"-framework AudioToolbox"
+		"-framework CoreAudio"
+		"-framework CoreFoundation"
+		"-framework OpenGL"
+		"-lstdc++"
+		"-lobjc"
+	)
+	target_compile_options(${PROJECT_NAME}
+		PUBLIC
+		"-m64"
+	)
+	target_link_options(${PROJECT_NAME}
+		PUBLIC
+		"-m64"
+	)
+elseif(WIN32)
+	target_link_libraries(${PROJECT_NAME}
+		PUBLIC
+		winmm
+		dsound
+		ole32
+	)
+endif()
 
-target_link_options(${PROJECT_NAME}
-	PUBLIC
-	"-m64"
-)
-
-# Copy resources if the directory exists
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/resources)
+# Copy resources if the directory exists (macOS bundle structure only)
+if(APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/resources)
     add_custom_command(TARGET ${PROJECT_NAME}
         POST_BUILD
-        COMMAND mkdir -p ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Resources
-        COMMAND cp -f ${CMAKE_CURRENT_SOURCE_DIR}/resources/* ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Resources
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Resources
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/resources ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/sunvox~.mxo/Contents/Resources
     )
 endif()
 

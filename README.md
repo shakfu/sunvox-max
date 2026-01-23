@@ -19,17 +19,38 @@ Fully functional macOS external with comprehensive SunVox API coverage (60+ mess
 
 ## Installation
 
-1. Build the external (see below)
-2. Copy `externals/sunvox~.mxo` to your Max packages or externals folder
-3. Copy `help/sunvox~.maxhelp` alongside the external
+> **Important**: This project uses **symlinks** for installation, not file copying. Running `make setup` creates a symbolic link from your Max Packages folder to this repository. This means:
+> - Changes to the repo are immediately reflected in Max
+> - You must keep this repository in place (do not move or delete it)
+> - This approach is atypical but intentional - it simplifies development workflows
+
+### Quick Start
+
+```bash
+git clone https://github.com/yourusername/sunvox-max.git
+cd sunvox-max
+make setup   # Creates symlinks to Max 8/9 Packages directories
+make all     # Build and sign
+```
+
+After `make setup`, Max will find the package via the symlink. No manual copying required.
+
+### Manual Installation (Alternative)
+
+If you prefer traditional installation without symlinks:
+
+1. Build the external: `make build && make sign`
+2. Copy the entire repository folder to `~/Documents/Max 8/Packages/` (or Max 9)
+3. Or copy just the external: `externals/sunvox~.mxo` to your Max externals folder, and `help/sunvox~.maxhelp` alongside it
 
 ## Building
 
 ```bash
-make setup   # Initialize submodules, create symlinks
-make build   # Build the external
-make sign    # Code sign (macOS)
-make all     # Clean, build, and sign
+make setup      # Initialize submodules, create symlinks to Max Packages
+make build      # Build the external
+make sign       # Code sign (macOS)
+make all        # Clean, build, and sign
+make help       # Show all available targets
 ```
 
 Output: `externals/sunvox~.mxo`
