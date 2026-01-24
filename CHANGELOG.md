@@ -2,6 +2,14 @@
 
 All notable changes to sunvox-max will be documented in this file.
 
+## [1.0.1] - 2025-01-24
+
+### Fixed
+- **Crash on audio start** - Fixed segfault when enabling audio in Max/MSP
+  - Root cause: `g_app_config` array in SunVox library was terminated with `"0"` (string) instead of `NULL` (null pointer)
+  - The config loop would read past array bounds, passing garbage pointer `0x1` to `smem_strlen()`, causing SIGSEGV
+  - Fix: Changed sentinel from `"0"` to `NULL` in `sunvox_lib.cpp`
+
 ## [1.0.0] - 2025-01-20
 
 ### Added

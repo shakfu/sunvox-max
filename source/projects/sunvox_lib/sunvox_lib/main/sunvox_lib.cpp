@@ -34,7 +34,7 @@
     #endif
 #endif
 
-const char* g_app_config[] = { "1:/sunvox_dll_config.ini", "2:/sunvox_dll_config.ini", "0" };
+const char* g_app_config[] = { "1:/sunvox_dll_config.ini", "2:/sunvox_dll_config.ini", NULL };
 const char* g_app_log = "3:/sunvox_dll_log.txt";
 const char* g_app_name = "SunVox Library";
 const char* g_app_name_short = "SunVox Library";
