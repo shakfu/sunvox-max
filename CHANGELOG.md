@@ -2,6 +2,23 @@
 
 All notable changes to sunvox-max will be documented in this file.
 
+## [1.0.2] - 2025-01-25
+
+### Added
+- **Windows support** - Makefile now builds on both macOS and Windows
+  - Platform detection via `$(OS)` and `uname -s`
+  - Windows uses Visual Studio 2022 generator, `.mxe64` output
+  - macOS uses Xcode generator, `.mxo` output
+
+### Changed
+- **Makefile refactored for cross-platform builds**
+  - Platform-specific variables for paths, generators, and commands
+  - Code signing removed from default `make all` target (Xcode signs automatically)
+  - `make sign` still available for non-Xcode generator builds
+  - Symlink creation (`make link`) skipped on Windows (requires admin privileges)
+  - `make setup` on Windows only initializes submodules; users copy package manually
+- **README updated** with separate macOS and Windows installation instructions
+
 ## [1.0.1] - 2025-01-24
 
 ### Fixed
