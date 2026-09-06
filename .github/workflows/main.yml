@@ -17,7 +17,7 @@ jobs:
         config: [Release]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         submodules: 'recursive'
         fetch-depth: '0'
@@ -130,7 +130,7 @@ jobs:
         Write-Host "Package contents:"
         Get-ChildItem -Recurse $pkg
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: ${{ github.event.repository.name }}-${{ steps.short-sha.outputs.sha }}-${{ matrix.config }}-${{ matrix.os }}
         path: ${{ github.event.repository.name }}
@@ -148,12 +148,12 @@ jobs:
       with:
         length: 7
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: ${{ github.event.repository.name }}-${{ steps.short-sha.outputs.sha }}-Release-macos-latest
         path: ${{ github.event.repository.name }}-macos
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: ${{ github.event.repository.name }}-${{ steps.short-sha.outputs.sha }}-Release-windows-latest
         path: ${{ github.event.repository.name }}-windows
@@ -170,7 +170,7 @@ jobs:
         zip -r ${{ github.event.repository.name }}-${{ github.ref_name }}-macos.zip ${{ github.event.repository.name }}-macos
         zip -r ${{ github.event.repository.name }}-${{ github.ref_name }}-windows.zip ${{ github.event.repository.name }}-windows
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: ${{ github.event.repository.name }}-${{ github.ref_name }}-release
         path: |
